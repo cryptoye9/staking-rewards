@@ -11,9 +11,10 @@ import "./interfaces/IStakingTripleRewards.sol";
 
 contract TripleRewardsDistributionRecipient is Ownable {
     address public TripleRewardsDistribution;
+    error Forbidden();
 
     modifier onlyTripleRewardsDistribution() {
-        require(msg.sender == TripleRewardsDistribution, "Caller is not TripleRewardsDistribution contract");
+        if (msg.sender != TripleRewardsDistribution) revert Forbidden();
         _;
     }
 }
@@ -36,6 +37,12 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
     
+    error NotAContract();
+    error ZeroAmount();
+    error CannotReduceExistingPeriod();
+    error ProvidedRewardTooHigh();
+    error CannotWithdrawStakingToken();
+
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
@@ -45,7 +52,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     ) public {
         // todo: add checks for not the same tokens
         for (uint8 i = 0; i < _rewardsTokens.length; ++i) {
-            require(Address.isContract(_rewardsTokens[i]), "Not a contract");
+            if (!Address.isContract(_rewardsTokens[i])) revert NotAContract();
             rewardsTokens[i] = IERC20(_rewardsTokens[i]);
         }
         stakingToken = IERC20(_stakingToken);
@@ -80,7 +87,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function stake(uint256 amount) external nonReentrant updateReward(msg.sender) override {
-        require(amount > 0, "Cannot stake 0");
+        if (amount == 0) revert ZeroAmount();
         _totalSupply += amount;
         _balances[msg.sender] += amount;
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -88,7 +95,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     }
 
     function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) override {
-        require(amount > 0, "Cannot withdraw 0");
+        if (amount == 0) revert ZeroAmount();
         _totalSupply -= amount;
         _balances[msg.sender] -= amount;
         stakingToken.safeTransfer(msg.sender, amount);
@@ -114,7 +121,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     /* ========== RESTRICTED FUNCTIONS ========== */
 
     function notifyRewardAmount(uint256[] calldata rewardAmounts, uint256 rewardsDuration) external onlyTripleRewardsDistribution updateReward(address(0)) {
-        require((block.timestamp + rewardsDuration) >= periodFinish, "Cannot reduce existing period");
+        if ((block.timestamp + rewardsDuration) < periodFinish) revert CannotReduceExistingPeriod();
 
         if (block.timestamp >= periodFinish) {
             for (uint8 i = 0; i < 3; ++i) {
@@ -137,7 +144,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
         uint balancePerToken;
         for (uint8 i = 0; i < 3; ++i) {
             balancePerToken = rewardsTokens[i].balanceOf(address(this));
-            require(rewardRates[i] <= (balancePerToken / rewardsDuration), "Provided reward too high");
+            if (rewardRates[i] > (balancePerToken / rewardsDuration)) revert ProvidedRewardTooHigh();
         }
 
         lastUpdateTime = block.timestamp;
@@ -147,7 +154,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
 
     // Added to support recovering LP Rewards in case of emergency
     function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
-        require(tokenAddress != address(stakingToken), "Cannot withdraw the staking token");
+        if (tokenAddress == address(stakingToken)) revert CannotWithdrawStakingToken();
         IERC20(tokenAddress).safeTransfer(msg.sender, tokenAmount);
         emit Recovered(tokenAddress, tokenAmount);
     }

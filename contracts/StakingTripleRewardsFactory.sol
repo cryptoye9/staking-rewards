@@ -12,8 +12,6 @@ import "./StakingTripleRewards.sol";
 
 contract StakingRewardsFactory is Ownable {
     using SafeERC20 for IERC20;
-    // immutables
-    uint public stakingRewardsGenesis;
 
     // the staking tokens for which the rewards contract has been deployed
     address[] public stakingTokens;
@@ -28,6 +26,11 @@ contract StakingRewardsFactory is Ownable {
 
     // rewards info by staking token
     mapping(address => StakingRewardsInfo) public stakingRewardsInfoByStakingToken;
+
+    error NotAContract();
+    error AlreadyDeployed();
+    error NotDeployed();
+    error CalledBeforeAnyDeploys();
 
     constructor() {}
 
@@ -45,12 +48,12 @@ contract StakingRewardsFactory is Ownable {
         onlyOwner
     {
         for (uint8 i = 0; i < _rewardsTokens.length; ++i) {
-            require(Address.isContract(_rewardsTokens[i]), "Not a contract");
+            if(!Address.isContract(_rewardsTokens[i])) revert NotAContract();
         }
 
         StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
 
-        require(info.stakingRewards == address(0), 'StakingRewardsFactory::deploy: already deployed');
+        if (info.stakingRewards != address(0)) revert AlreadyDeployed();
 
         info.stakingRewards = address(new StakingTripleRewards(
                 address(this),
@@ -70,7 +73,7 @@ contract StakingRewardsFactory is Ownable {
 
     function update(address stakingToken, uint256[] calldata _rewardAmounts, uint256 rewardsDuration) public onlyOwner {
         StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
-        require(info.stakingRewards != address(0), 'StakingRewardsFactory::update: not deployed');
+        if (info.stakingRewards == address(0)) revert NotDeployed();
 
         for (uint8 i = 0; i < _rewardAmounts.length; ++i) {
             info.rewardAmounts[i] = _rewardAmounts[i];
@@ -85,7 +88,7 @@ contract StakingRewardsFactory is Ownable {
 
     // call notifyRewardAmount for all staking tokens.
     function notifyRewardAmounts() public {
-        require(stakingTokens.length > 0, 'StakingRewardsFactory::notifyRewardAmounts: called before any deploys');
+        if (stakingTokens.length == 0) revert CalledBeforeAnyDeploys();
         for (uint i = 0; i < stakingTokens.length; i++) {
             notifyRewardAmount(stakingTokens[i]);
         }
@@ -94,10 +97,8 @@ contract StakingRewardsFactory is Ownable {
     // notify reward amount for an individual staking token.
     // this is a fallback in case the notifyRewardAmounts costs too much gas to call for all contracts
     function notifyRewardAmount(address stakingToken) public {
-        require(block.timestamp >= stakingRewardsGenesis, 'StakingRewardsFactory::notifyRewardAmount: not ready');
-
         StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
-        require(info.stakingRewards != address(0), 'StakingRewardsFactory::notifyRewardAmount: not deployed');
+        if (info.stakingRewards == address(0)) revert NotDeployed();
 
         uint256[] memory rewardAmounts;
         if (info.duration > 0) {
