@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IStakingTripleRewards.sol";
 import "./StakingTripleRewards.sol";
 
-contract StakingRewardsFactory is Ownable {
+contract StakingTripleRewardsFactory is Ownable {
     using SafeERC20 for IERC20;
 
     // the staking tokens for which the rewards contract has been deployed
