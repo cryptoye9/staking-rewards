@@ -13,9 +13,6 @@ import "./StakingTripleRewards.sol";
 contract StakingTripleRewardsFactory is Ownable {
     using SafeERC20 for IERC20;
 
-    // the staking tokens for which the rewards contract has been deployed
-    address[] public stakingTokens;
-
     // info about rewards for a particular staking token
     struct StakingRewardsInfo {
         address stakingRewards;
@@ -24,8 +21,10 @@ contract StakingTripleRewardsFactory is Ownable {
         uint256 duration;
     }
 
+    uint8 stakingRewardsCount;
+
     // rewards info by staking token
-    mapping(address => StakingRewardsInfo) public stakingRewardsInfoByStakingToken;
+    mapping(uint8 => StakingRewardsInfo) public stakingRewardsInfo;
 
     error NotAContract();
     error AlreadyDeployed();
@@ -51,14 +50,13 @@ contract StakingTripleRewardsFactory is Ownable {
             if(!Address.isContract(_rewardsTokens[i])) revert NotAContract();
         }
 
-        StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
+        StakingRewardsInfo storage info = stakingRewardsInfo[stakingRewardsCount++];
 
         if (info.stakingRewards != address(0)) revert AlreadyDeployed();
 
         info.stakingRewards = address(new StakingTripleRewards(
                 address(this),
-                _rewardsTokens,
-                stakingToken
+                _rewardsTokens
             )
         ); 
         
@@ -68,11 +66,10 @@ contract StakingTripleRewardsFactory is Ownable {
         }
 
         info.duration = rewardsDuration;
-        stakingTokens.push(stakingToken);
     }
 
-    function update(address stakingToken, uint256[] calldata _rewardAmounts, uint256 rewardsDuration) public onlyOwner {
-        StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
+    function update(uint8 stakingId, uint256[] calldata _rewardAmounts, uint256 rewardsDuration) public onlyOwner {
+        StakingRewardsInfo storage info = stakingRewardsInfo[stakingId];
         if (info.stakingRewards == address(0)) revert NotDeployed();
 
         for (uint8 i = 0; i < _rewardAmounts.length; ++i) {
@@ -88,21 +85,21 @@ contract StakingTripleRewardsFactory is Ownable {
 
     // call notifyRewardAmount for all staking tokens.
     function notifyRewardAmounts() public {
-        if (stakingTokens.length == 0) revert CalledBeforeAnyDeploys();
-        for (uint i = 0; i < stakingTokens.length; i++) {
-            notifyRewardAmount(stakingTokens[i]);
+        if (stakingRewardsCount == 0) revert CalledBeforeAnyDeploys();
+        for (uint8 i = 0; i < stakingRewardsCount; ++i) {
+            notifyRewardAmount(i);
         }
     }
 
     // notify reward amount for an individual staking token.
     // this is a fallback in case the notifyRewardAmounts costs too much gas to call for all contracts
-    function notifyRewardAmount(address stakingToken) public {
-        StakingRewardsInfo storage info = stakingRewardsInfoByStakingToken[stakingToken];
+    function notifyRewardAmount(uint8 stakingId) public {
+        StakingRewardsInfo storage info = stakingRewardsInfo[stakingId];
         if (info.stakingRewards == address(0)) revert NotDeployed();
 
         uint256[] memory rewardAmounts;
         if (info.duration > 0) {
-            for (uint i = 0; i < stakingTokens.length; i++) {
+            for (uint i = 0; i < 3; i++) {
                 rewardAmounts[i] = info.rewardAmounts[i];
                 info.rewardAmounts[i] = 0;
             }
@@ -110,7 +107,7 @@ contract StakingTripleRewardsFactory is Ownable {
             uint256 duration = info.duration;
             info.duration = 0;
 
-            for (uint i = 0; i < stakingTokens.length; i++) {
+            for (uint i = 0; i < 3; i++) {
                 if (rewardAmounts[i] > 0) {
                     IERC20(info.rewardsTokens[i]).safeTransfer(info.stakingRewards, rewardAmounts[i]);
                 }

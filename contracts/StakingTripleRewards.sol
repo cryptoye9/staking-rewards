@@ -25,7 +25,6 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     /* ========== STATE VARIABLES ========== */
 
     IERC20[] public rewardsTokens;
-    IERC20 public stakingToken;
     uint256 public periodFinish = 0;
     uint256[] public rewardRates;
     uint256 public lastUpdateTime;
@@ -41,21 +40,18 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     error ZeroAmount();
     error CannotReduceExistingPeriod();
     error ProvidedRewardTooHigh();
-    error CannotWithdrawStakingToken();
 
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _TripleRewardsDistribution,
-        address[] memory _rewardsTokens,
-        address _stakingToken
+        address[] memory _rewardsTokens
     ) public {
         // todo: add checks for not the same tokens
         for (uint8 i = 0; i < _rewardsTokens.length; ++i) {
             if (!Address.isContract(_rewardsTokens[i])) revert NotAContract();
             rewardsTokens[i] = IERC20(_rewardsTokens[i]);
         }
-        stakingToken = IERC20(_stakingToken);
         TripleRewardsDistribution = _TripleRewardsDistribution;
     }
 
@@ -86,19 +82,18 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function stake(uint256 amount) external nonReentrant updateReward(msg.sender) override {
-        if (amount == 0) revert ZeroAmount();
-        _totalSupply += amount;
-        _balances[msg.sender] += amount;
-        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
-        emit Staked(msg.sender, amount);
+    function stake() payable external override nonReentrant updateReward(msg.sender) {
+        if (msg.value == 0) revert ZeroAmount();
+        _totalSupply += msg.value;
+        _balances[msg.sender] += msg.value;
+        emit Staked(msg.sender, msg.value);
     }
 
-    function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) override {
+    function withdraw(uint256 amount) public override nonReentrant updateReward(msg.sender) {
         if (amount == 0) revert ZeroAmount();
         _totalSupply -= amount;
         _balances[msg.sender] -= amount;
-        stakingToken.safeTransfer(msg.sender, amount);
+        Address.sendValue(payable(msg.sender), amount);
         emit Withdrawn(msg.sender, amount);
     }
 
@@ -154,7 +149,6 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
 
     // Added to support recovering LP Rewards in case of emergency
     function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
-        if (tokenAddress == address(stakingToken)) revert CannotWithdrawStakingToken();
         IERC20(tokenAddress).safeTransfer(msg.sender, tokenAmount);
         emit Recovered(tokenAddress, tokenAmount);
     }
