@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IStakingTripleRewards.sol";
 
 
@@ -19,8 +18,7 @@ contract TripleRewardsDistributionRecipient is Ownable {
     }
 }
 
-contract IStakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributionRecipient, ReentrancyGuard {
-    using SafeMath for uint256;
+contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributionRecipient, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /* ========== STATE VARIABLES ========== */
@@ -72,30 +70,27 @@ contract IStakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributi
         if (_totalSupply == 0) {
             return rewardPerTokensStored[index];
         }
-        return
-            rewardPerTokensStored[index].add(
-                lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRates[index]).mul(1e18).div(_totalSupply)
-            );
+        return rewardPerTokensStored[index] + (lastTimeRewardApplicable() - lastUpdateTime) * rewardRates[index] * 1e18 / _totalSupply;
     }
 
     function earnedPerToken(address account, uint8 index) public view returns (uint256) {
-        return _balances[account].mul(rewardPerToken(index).sub(userRewardPerTokensPaid[account][index])).div(1e18).add(rewardPerTokens[account][index]);
+        return _balances[account] * (rewardPerToken(index) - userRewardPerTokensPaid[account][index]) / 1e18 + rewardPerTokens[account][index];
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function stake(uint256 amount) external nonReentrant updateReward(msg.sender) override {
         require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        _totalSupply += amount;
+        _balances[msg.sender] += amount;
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) override {
         require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
+        _totalSupply -= amount;
+        _balances[msg.sender] -= amount;
         stakingToken.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -119,19 +114,19 @@ contract IStakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributi
     /* ========== RESTRICTED FUNCTIONS ========== */
 
     function notifyRewardAmount(uint256[] calldata rewardAmounts, uint256 rewardsDuration) external onlyTripleRewardsDistribution updateReward(address(0)) {
-        require(block.timestamp.add(rewardsDuration) >= periodFinish, "Cannot reduce existing period");
+        require((block.timestamp + rewardsDuration) >= periodFinish, "Cannot reduce existing period");
 
         if (block.timestamp >= periodFinish) {
             for (uint8 i = 0; i < 3; ++i) {
-                rewardRates[i] = rewardAmounts[i].div(rewardsDuration);
+                rewardRates[i] = rewardAmounts[i] / rewardsDuration;
             }
         } else {
-            uint256 remaining = periodFinish.sub(block.timestamp);
+            uint256 remaining = periodFinish - block.timestamp;
 
             uint256 leftover;
             for (uint8 i = 0; i < 3; ++i) {
-                leftover = remaining.mul(rewardRates[i]);
-                rewardRates[i] = rewardAmounts[i].add(leftover).div(rewardsDuration);
+                leftover = remaining * rewardRates[i];
+                rewardRates[i] = (rewardAmounts[i] + leftover) / rewardsDuration;
             }
         }
 
@@ -142,11 +137,11 @@ contract IStakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributi
         uint balancePerToken;
         for (uint8 i = 0; i < 3; ++i) {
             balancePerToken = rewardsTokens[i].balanceOf(address(this));
-            require(rewardRates[i] <= balancePerToken.div(rewardsDuration), "Provided reward too high");
+            require(rewardRates[i] <= (balancePerToken / rewardsDuration), "Provided reward too high");
         }
 
         lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.add(rewardsDuration);
+        periodFinish = block.timestamp + rewardsDuration;
         emit RewardAdded(rewardAmounts, periodFinish);
     }
 
