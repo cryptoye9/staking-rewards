@@ -7,18 +7,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./interfaces/IStakingRewards.sol";
 
-interface IStakingRewards {
-    function lastTimeRewardApplicable() external view returns (uint256);
-    function rewardPerToken() external view returns (uint256);
-    function earned(address account) external view returns (uint256);
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function stake() payable external;
-    function withdraw(uint256 amount) external;
-    function getReward() external;
-    function exit() external;
-}
 
 contract RewardsDistributionRecipient {
     address public rewardsDistribution;
