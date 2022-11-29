@@ -10,6 +10,10 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./interfaces/IStakingTripleRewards.sol";
 import "./StakingTripleRewards.sol";
 
+/**
+ * @title StakingTripleRewardsFactory
+ * @notice Deploys staking contracts and distribute rewards from them
+ */
 contract StakingTripleRewardsFactory is Ownable {
     using SafeERC20 for IERC20;
 
@@ -33,12 +37,14 @@ contract StakingTripleRewardsFactory is Ownable {
 
     constructor() {}
 
-    ///// permissioned functions
-
-    // deploy a staking reward contract for the staking token, and store the reward amount
-    // the reward will be distributed to the staking reward contract no sooner than the genesis
+    /**
+     * @notice Deploys a staking reward contract for setting rewards tokens and their amounts for pool 
+     * and rewards distribution period. Can only be called by contract owner.
+     * @param _rewardsTokens array of rewards tokens addresses
+     * @param _rewardAmounts array of amounts of rewards in corresponding rewards tokens
+     * @param rewardsDuration duration of rewards distribution
+     */
     function deploy(
-        address stakingToken,
         address[] calldata _rewardsTokens,
         uint256[] calldata _rewardAmounts,
         uint256 rewardsDuration
@@ -68,6 +74,13 @@ contract StakingTripleRewardsFactory is Ownable {
         info.duration = rewardsDuration;
     }
 
+    /**
+     * @notice Updates staking reward contract by its id for setting rewards tokens amounts for pool 
+     * and rewards distribution period. Can only be called by contract owner.
+     * @param stakingId id of staking rewards 
+     * @param _rewardAmounts array of amounts of rewards in corresponding rewards tokens
+     * @param rewardsDuration duration of rewards distribution
+     */
     function update(uint8 stakingId, uint256[] calldata _rewardAmounts, uint256 rewardsDuration) public onlyOwner {
         StakingRewardsInfo storage info = stakingRewardsInfo[stakingId];
         if (info.stakingRewards == address(0)) revert NotDeployed();
@@ -79,11 +92,9 @@ contract StakingTripleRewardsFactory is Ownable {
         info.duration = rewardsDuration;
     }
 
-
-
-    ///// permissionless functions
-
-    // call notifyRewardAmount for all staking tokens.
+    /**
+     * @notice Calls notifyRewardAmounts for all staking rewards contracts. Can only be called by contract owner.
+     */
     function notifyRewardAmounts() public {
         if (stakingRewardsCount == 0) revert CalledBeforeAnyDeploys();
         for (uint8 i = 0; i < stakingRewardsCount; ++i) {
@@ -91,9 +102,14 @@ contract StakingTripleRewardsFactory is Ownable {
         }
     }
 
-    // notify reward amount for an individual staking token.
+    // notify reward amount for an individual staking rewards contract.
     // this is a fallback in case the notifyRewardAmounts costs too much gas to call for all contracts
-    function notifyRewardAmount(uint8 stakingId) public {
+    /**
+     * @notice Notify reward amount for an individual staking rewards contract.
+     * and rewards distribution period. Can only be called by contract owner.
+     * @param stakingId id of staking rewards 
+     */
+    function notifyRewardAmount(uint8 stakingId) public onlyOwner {
         StakingRewardsInfo storage info = stakingRewardsInfo[stakingId];
         if (info.stakingRewards == address(0)) revert NotDeployed();
 
@@ -117,6 +133,12 @@ contract StakingTripleRewardsFactory is Ownable {
         }
     }
 
+    /**
+     * @notice Rescues the amount of ERC20 token transferred to contract.
+     * Can only be called by owner.
+     * @param tokenAddress address of ERC20 token to rescue
+     * @param tokenAmount amount of given ERC20 token
+     */
     function pullExtraTokens(address token, uint256 amount) external onlyOwner {
         IERC20(token).transfer(msg.sender, amount);
     }
