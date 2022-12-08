@@ -64,7 +64,9 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
             if (!Address.isContract(_rewardsTokens[i])) revert NotAContract();
             rewardsTokens[i] = IERC20(_rewardsTokens[i]);
         }
-        TripleRewardsDistribution = _TripleRewardsDistribution;
+
+        if (Address.isContract(_TripleRewardsDistribution)) TripleRewardsDistribution = _TripleRewardsDistribution;
+        else revert NotAContract();
     }
 
     /* ========== VIEWS ========== */
