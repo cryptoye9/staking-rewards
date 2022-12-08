@@ -33,6 +33,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     uint256[] public rewardRates;
     uint256 public lastUpdateTime;
     uint256[] public rewardPerTokensStored;
+    uint8 constant rewardTokensAmount = 3;
 
     mapping(address => uint256[]) public userRewardPerTokensPaid;
     mapping(address => uint256[]) public rewardPerTokens;
@@ -44,6 +45,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     error ZeroAmount();
     error CannotReduceExistingPeriod();
     error ProvidedRewardTooHigh();
+    error NotCorrectRewardTokensAmount();
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -57,7 +59,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
         address _TripleRewardsDistribution,
         address[] memory _rewardsTokens
     ) public {
-        // todo: add checks for not the same tokens
+        if (_rewardsTokens.length != rewardTokensAmount) revert NotCorrectRewardTokensAmount();
         for (uint8 i = 0; i < _rewardsTokens.length; ++i) {
             if (!Address.isContract(_rewardsTokens[i])) revert NotAContract();
             rewardsTokens[i] = IERC20(_rewardsTokens[i]);
@@ -138,7 +140,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
      * @dev Updates current amount of rewards by all rewards tokens for caller account
      */
     function getReward() public nonReentrant updateReward(msg.sender) override {
-        for (uint8 i = 0; i < 3; ++i) {
+        for (uint8 i = 0; i < rewardTokensAmount; ++i) {
             if (rewardPerTokens[msg.sender][i] > 0) {
                 uint256 rewardAmount = rewardPerTokens[msg.sender][i];
                 rewardPerTokens[msg.sender][i] = 0;
@@ -168,15 +170,16 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     function notifyRewardAmount(uint256[] calldata rewardAmounts, uint256 rewardsDuration) external onlyTripleRewardsDistribution updateReward(address(0)) {
         if ((block.timestamp + rewardsDuration) < periodFinish) revert CannotReduceExistingPeriod();
 
+        if (rewardAmounts.length != rewardTokensAmount) revert NotCorrectRewardTokensAmount();
         if (block.timestamp >= periodFinish) {
-            for (uint8 i = 0; i < 3; ++i) {
+            for (uint8 i = 0; i < rewardAmounts.length; ++i) {
                 rewardRates[i] = rewardAmounts[i] / rewardsDuration;
             }
         } else {
             uint256 remaining = periodFinish - block.timestamp;
 
             uint256 leftover;
-            for (uint8 i = 0; i < 3; ++i) {
+            for (uint8 i = 0; i < rewardAmounts.length; ++i) {
                 leftover = remaining * rewardRates[i];
                 rewardRates[i] = (rewardAmounts[i] + leftover) / rewardsDuration;
             }
@@ -187,7 +190,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
         uint balancePerToken;
-        for (uint8 i = 0; i < 3; ++i) {
+        for (uint8 i = 0; i < rewardAmounts.length; ++i) {
             balancePerToken = rewardsTokens[i].balanceOf(address(this));
             if (rewardRates[i] > (balancePerToken / rewardsDuration)) revert ProvidedRewardTooHigh();
         }
@@ -216,7 +219,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
      * @param rewardsDuration time for rewards distribution which being added to current timestamp
      */
     modifier updateReward(address account) {
-        for (uint8 i = 0; i < 3; ++i) {
+        for (uint8 i = 0; i < rewardTokensAmount; ++i) {
             lastUpdateTime = lastTimeRewardApplicable();
             if (account != address(0)) {
                 rewardPerTokens[account][i] = earnedPerToken(account, i);

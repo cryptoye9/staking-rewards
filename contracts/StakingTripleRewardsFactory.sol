@@ -26,6 +26,7 @@ contract StakingTripleRewardsFactory is Ownable {
     }
 
     uint8 stakingRewardsCount;
+    uint8 constant rewardTokensAmount = 3;
 
     // rewards info by staking token
     mapping(uint8 => StakingRewardsInfo) public stakingRewardsInfo;
@@ -34,6 +35,7 @@ contract StakingTripleRewardsFactory is Ownable {
     error AlreadyDeployed();
     error NotDeployed();
     error CalledBeforeAnyDeploys();
+    error NotCorrectRewardTokensAmount();
 
     constructor() {}
 
@@ -52,6 +54,7 @@ contract StakingTripleRewardsFactory is Ownable {
         public
         onlyOwner
     {
+        if (_rewardsTokens.length != rewardTokensAmount) revert NotCorrectRewardTokensAmount();
         for (uint8 i = 0; i < _rewardsTokens.length; ++i) {
             if(!Address.isContract(_rewardsTokens[i])) revert NotAContract();
         }
@@ -85,6 +88,7 @@ contract StakingTripleRewardsFactory is Ownable {
         StakingRewardsInfo storage info = stakingRewardsInfo[stakingId];
         if (info.stakingRewards == address(0)) revert NotDeployed();
 
+        if (_rewardAmounts.length != rewardTokensAmount) revert NotCorrectRewardTokensAmount();
         for (uint8 i = 0; i < _rewardAmounts.length; ++i) {
             info.rewardAmounts[i] = _rewardAmounts[i];
         }
@@ -115,7 +119,7 @@ contract StakingTripleRewardsFactory is Ownable {
 
         uint256[] memory rewardAmounts;
         if (info.duration > 0) {
-            for (uint i = 0; i < 3; i++) {
+            for (uint i = 0; i < rewardTokensAmount; i++) {
                 rewardAmounts[i] = info.rewardAmounts[i];
                 info.rewardAmounts[i] = 0;
             }
@@ -123,7 +127,7 @@ contract StakingTripleRewardsFactory is Ownable {
             uint256 duration = info.duration;
             info.duration = 0;
 
-            for (uint i = 0; i < 3; i++) {
+            for (uint i = 0; i < rewardTokensAmount; i++) {
                 if (rewardAmounts[i] > 0) {
                     IERC20(info.rewardsTokens[i]).safeTransfer(info.stakingRewards, rewardAmounts[i]);
                 }
