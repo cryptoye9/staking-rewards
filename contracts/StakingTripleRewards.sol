@@ -218,10 +218,11 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
      */
     modifier updateReward(address account) {
         for (uint8 i = 0; i < rewardTokensAmount; ++i) {
+            rewardPerTokensStored[i] = rewardPerToken(i);
             lastUpdateTime = lastTimeRewardApplicable();
             if (account != address(0)) {
                 rewardPerTokens[account][i] = earnedPerToken(account, i);
-                userRewardPerTokensPaid[account][i] = rewardPerToken(i);
+                userRewardPerTokensPaid[account][i] = rewardPerTokensStored[i];
             } 
         }        
         _;
