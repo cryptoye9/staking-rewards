@@ -140,6 +140,6 @@ contract StakingTripleRewardsFactory is Ownable {
      * @param tokenAmount amount of given ERC20 token
      */
     function pullExtraTokens(address token, uint256 amount) external onlyOwner {
-        IERC20(token).transfer(msg.sender, amount);
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
 }
