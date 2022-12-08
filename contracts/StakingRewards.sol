@@ -7,18 +7,8 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "./interfaces/IStakingRewards.sol";
 
-interface IStakingRewards {
-    function lastTimeRewardApplicable() external view returns (uint256);
-    function rewardPerToken() external view returns (uint256);
-    function earned(address account) external view returns (uint256);
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function stake() payable external;
-    function withdraw(uint256 amount) external;
-    function getReward() external;
-    function exit() external;
-}
 
 contract RewardsDistributionRecipient {
     address public rewardsDistribution;
@@ -30,7 +20,6 @@ contract RewardsDistributionRecipient {
 }
 
 contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     /* ========== STATE VARIABLES ========== */
@@ -80,29 +69,26 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         if (_totalSupply == 0) {
             return rewardPerTokenStored;
         }
-        return
-            rewardPerTokenStored.add(
-                lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply)
-            );
+        return rewardPerTokenStored + (lastTimeRewardApplicable() - lastUpdateTime) * rewardRate * 1e18 / _totalSupply;
     }
 
     function earned(address account) public view override returns (uint256) {
-        return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
+        return _balances[account] * (rewardPerToken() - userRewardPerTokenPaid[account]) / 1e18 + rewards[account];
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function stake() payable external override nonReentrant updateReward(msg.sender) {
         require(msg.value > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply.add(msg.value);
-        _balances[msg.sender] = _balances[msg.sender].add(msg.value);
+        _totalSupply += msg.value;
+        _balances[msg.sender] += msg.value;
         emit Staked(msg.sender, msg.value);
     }
 
     function withdraw(uint256 amount) public override nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
+        _totalSupply -= amount;
+        _balances[msg.sender] -= amount;
         Address.sendValue(payable(msg.sender), amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -127,14 +113,14 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         uint256 reward, 
         uint256 rewardsDuration
     ) external onlyRewardsDistribution updateReward(address(0)) {
-        require(block.timestamp.add(rewardsDuration) >= periodFinish, "Cannot reduce existing period");
+        require((block.timestamp + rewardsDuration) >= periodFinish, "Cannot reduce existing period");
         
         if (block.timestamp >= periodFinish) {
-            rewardRate = reward.div(rewardsDuration);
+            rewardRate = reward / rewardsDuration;
         } else {
-            uint256 remaining = periodFinish.sub(block.timestamp);
-            uint256 leftover = remaining.mul(rewardRate);
-            rewardRate = reward.add(leftover).div(rewardsDuration);
+            uint256 remaining = periodFinish - block.timestamp;
+            uint256 leftover = remaining * rewardRate;
+            rewardRate = (reward + leftover) / rewardsDuration;
         }
 
         // Ensure the provided reward amount is not more than the balance in the contract.
@@ -142,10 +128,10 @@ contract StakingRewards is IStakingRewards, RewardsDistributionRecipient, Reentr
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
         uint balance = rewardsToken.balanceOf(address(this));
-        require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
+        require(rewardRate <= (balance / rewardsDuration), "Provided reward too high");
 
         lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.add(rewardsDuration);
+        periodFinish = block.timestamp + rewardsDuration;
         emit RewardAdded(reward, periodFinish);
     }
 
