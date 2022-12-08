@@ -46,6 +46,7 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     error CannotReduceExistingPeriod();
     error ProvidedRewardTooHigh();
     error NotCorrectRewardTokensAmount();
+    error RewardsTokensShouldDiffer();
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -60,6 +61,10 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
         address[] memory _rewardsTokens
     ) public {
         if (_rewardsTokens.length != rewardTokensAmount) revert NotCorrectRewardTokensAmount();
+        if (_rewardsTokens[0] == _rewardsTokens[1] ||
+            _rewardsTokens[1] == _rewardsTokens[2] ||
+            _rewardsTokens[0] == _rewardsTokens[2]
+        ) revert RewardsTokensShouldDiffer();
         for (uint8 i = 0; i < _rewardsTokens.length; ++i) {
             if (!Address.isContract(_rewardsTokens[i])) revert NotAContract();
             rewardsTokens[i] = IERC20(_rewardsTokens[i]);
