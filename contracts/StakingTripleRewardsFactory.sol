@@ -140,8 +140,8 @@ contract StakingTripleRewardsFactory is Ownable {
     /**
      * @notice Rescues the amount of ERC20 token transferred to contract.
      * Can only be called by owner.
-     * @param tokenAddress address of ERC20 token to rescue
-     * @param tokenAmount amount of given ERC20 token
+     * @param token address of ERC20 token to rescue
+     * @param amount amount of given ERC20 token
      */
     function pullExtraTokens(address token, uint256 amount) external onlyOwner {
         IERC20(token).safeTransfer(msg.sender, amount);

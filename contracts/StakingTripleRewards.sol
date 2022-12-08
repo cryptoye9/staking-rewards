@@ -152,7 +152,6 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
 
     /**
      * @notice Exits staking by withdrawing staking ether and withdrawing all rewards
-     * @param amount amount of ether user willing to withdraw
      */
     function exit() external override {
         withdraw(_balances[msg.sender]);
@@ -216,7 +215,6 @@ contract StakingTripleRewards is IStakingTripleRewards, TripleRewardsDistributio
     /**
      * @notice Updates the amounts of current reward for given account address.
      * @param account staking account's address
-     * @param rewardsDuration time for rewards distribution which being added to current timestamp
      */
     modifier updateReward(address account) {
         for (uint8 i = 0; i < rewardTokensAmount; ++i) {
