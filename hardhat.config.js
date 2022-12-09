@@ -16,7 +16,12 @@ require("@nomiclabs/hardhat-web3");
  *
  * Setting in `.env` file.
  */
-const PRIVATE_KEYS = process.env.PRIVATE_KEYS ? process.env.PRIVATE_KEYS.split(",") : [];
+//const PRIVATE_KEYS = process.env.PRIVATE_KEYS ? process.env.PRIVATE_KEYS.split(",") : [];
+const BSC_PRIVATE_KEY = process.env.BSC_PRIVATE_KEY || ''
+const BSCSCANAPIKEY_API_KEY = process.env.BSCSCANAPIKEY_API_KEY || ''
+const BSC_TESTNET_PRIVATE_KEY = process.env.BSC_TESTNET_PRIVATE_KEY || ''
+const BSC_TESTNET = process.env.BSC_TESTNET || ''
+const BSC_MAINNET = process.env.BSC_MAINNET || ''
 
 /*
  * The solc compiler optimizer configuration. (The optimizer is disabled by default).
@@ -77,23 +82,20 @@ module.exports = {
                 enabled: process.env.FORKING !== undefined
             }
         },
-        // Rest parameter (...) to treat it as a single array (added in ES6)
+        testnet: {
+            url: BSC_TESTNET,
+            chainId: 97,
+            gasPrice: 16000000000,
+            gas: 21000000,
+            gasLimit: 21000000,
+            accounts: [BSC_TESTNET_PRIVATE_KEY],
+        },
         mainnet: {
-            url: process.env.MAINNET_URL || "",
-            accounts: [...PRIVATE_KEYS]
+            url: BSC_MAINNET,
+            chainId: 56,
+            gasPrice: 10000000000,
+            accounts: [BSC_PRIVATE_KEY],
         },
-        rinkeby: {
-            url: process.env.RINKEBY_URL || "",
-            accounts: [...PRIVATE_KEYS]
-        },
-        ropsten: {
-            url: process.env.ROPSTEN_URL || "",
-            accounts: [...PRIVATE_KEYS]
-        },
-        kovan: {
-            url: process.env.KOVAN_URL || "",
-            accounts: [...PRIVATE_KEYS]
-        }
     },
     gasReporter: {
         enabled: process.env.REPORT_GAS !== undefined,
@@ -102,7 +104,7 @@ module.exports = {
         outputFile: process.env.GAS_REPORT_TO_FILE ? "gas-report.txt" : undefined
     },
     etherscan: {
-        apiKey: process.env.ETHERSCAN_API_KEY,
+        apiKey: process.env.BSCSCANAPIKEY_API_KEY,
         url: process.env.ETHERSCAN_URL || ""
         // Can be done this way for using of multiple API keys
         // This is not necessarily the same name that is used to define the network. See the link for details:
